@@ -5,29 +5,19 @@ import pg from "pg";
 const app = express();
 const port = 3000;
 
-let quiz = [
-  { country: "France", capital: "Paris" },
-  { country: "United Kingdom", capital: "London" },
-  { country: "United States of America", capital: "New York" },
-];
+import dotenv from "dotenv";
+dotenv.config();
 
 const db = new pg.Client({
   user: "postgres",
-  password: "@Caro07033",
+  password: process.env.DB_PASSWORD,
   database: "globe",
-  host: "localhost",
-  port: 5432,
+  host: "localhost"
 });
 
-db.connect(); // connect to the database
-
-db.query("SELECT * FROM capitals", (err, res) => {
-  if (err) {
-    console.error("Error executing query ", err.stack);
-  } else {
-    quiz = res.rows;
-  }
-});
+db.connect() 
+  .then(() => console.log("Connected to the database"))
+  .catch(err => console.error("Connection error", err.stack));
 
 let totalCorrect = 0;
 
@@ -35,18 +25,30 @@ let totalCorrect = 0;
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static("public"));
 
+  totalCorrect = 0;
+
+  let quiz = [];
+db.query("SELECT * FROM flags", (err, res) => {
+  if (err) {
+    console.error("Error executing query", err.stack);
+  } else {
+    quiz = res.rows;
+  }
+  db.end();
+});
+
 let currentQuestion = {};
 
 // GET home page
-app.get("/", (req, res) => {
+app.get("/", async (_req, res) => {
   totalCorrect = 0;
-  nextQuestion();
+  await nextQuestion();
   console.log(currentQuestion);
   res.render("index.ejs", { question: currentQuestion });
 });
 
 // POST a new post
-app.post("/submit", (req, res) => {
+app.post("/submit", async (req, res) => {
   let answer = req.body.answer.trim();
   let isCorrect = false;
   if (currentQuestion.capital.toLowerCase() === answer.toLowerCase()) {
@@ -62,8 +64,11 @@ app.post("/submit", (req, res) => {
     totalScore: totalCorrect,
   });
 });
-
-function nextQuestion() {
+async function nextQuestion() {
+  if (quiz.length === 0) {
+    currentQuestion = {};
+    return;
+  }
   const randomCountry = quiz[Math.floor(Math.random() * quiz.length)];
   currentQuestion = randomCountry;
 }
